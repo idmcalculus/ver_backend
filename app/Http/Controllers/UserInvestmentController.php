@@ -27,6 +27,18 @@ class UserInvestmentController extends Controller
         return $this->userInvestmentService->listInvestmentUser($request);
     }
 
+   /**
+     * Display a listing of the resource.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getInvestmentPerDay(Request $request)
+    {
+        return $this->userInvestmentService->getInvestmentPerday($request);
+    }
+
+
     /**
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
@@ -52,6 +64,17 @@ class UserInvestmentController extends Controller
         return $this->userInvestmentService->create($createUserInvestmentRequest);
     }
 
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @param
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function withdraw(Request $request)
+    {
+        return $this->userInvestmentService->withdraw($request);
+    }
+    
     /**
      * Display the specified resource.
      *

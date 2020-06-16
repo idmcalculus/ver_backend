@@ -62,6 +62,87 @@ class InvestmentController extends Controller
     }
 
     /**
+     * Display the specified resource.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function addGroup(Request $request)
+    {
+        return $this->investmentService->addPoolGroup($request);
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function addInvestmentToGroup(Request $request)
+    {
+        return $this->investmentService->addInvestmentToGroup($request);
+    }
+
+     /**
+     * Display the specified resource.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getInvestmentGroup(Request $request)
+    {
+        return $this->investmentService->getInvestmentGroup($request);
+    }
+    
+
+     /**
+     * Display the specified resource.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getPoolGroups(Request $request)
+    {
+        return $this->investmentService->getPoolGroups($request);
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function deletePoolGroup(Request $request)
+    {
+        return $this->investmentService->deletePoolGroup($request);
+    }
+
+    
+
+     /**
+     * Display the specified resource.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function editPoolGroup(Request $request)
+    {
+        return $this->investmentService->editPoolGroup($request);
+    }
+
+     /**
+     * Display the specified resource.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function deleteFromGroup(Request $request)
+    {
+        return $this->investmentService->deleteInvestmentFromGroup($request);
+    }
+
+
+    /**
      * Update the specified resource in storage.
      *
      * @param UpdateInvestmentRequest $updateInvestmentRequest

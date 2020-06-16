@@ -9,13 +9,15 @@ use App\Repositories\ReportRepository;
 use App\Repositories\SubcategoryRepository;
 use App\Repositories\UserInvestmentRepository;
 use App\Repositories\UserRepository;
+use App\Repositories\PoolGroupsRepository;
+use App\Repositories\InvestmentGroups;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class UserInvestmentService extends SmsService
 {
-    protected $userInvestmentRepository, $investmentRepository, $userRepository, $reportRepository;
+    protected $userInvestmentRepository,$PoolGroupsRepository, $investmentRepository, $userRepository, $reportRepository;
 
     /**
      * UserService constructor.
@@ -23,16 +25,19 @@ class UserInvestmentService extends SmsService
      * @param InvestmentRepository $investmentRepository
      * @param UserRepository $userRepository
      * @param ReportRepository $reportRepository
+     * @param PoolGroupsRepository $PoolGroupsRepository
      */
     public function __construct(UserInvestmentRepository $userInvestmentRepository,
                                 InvestmentRepository $investmentRepository,
                                 UserRepository $userRepository,
-                                ReportRepository $reportRepository)
+                                ReportRepository $reportRepository,
+                                PoolGroupsRepository $PoolGroupsRepository)
     {
         $this->userInvestmentRepository = $userInvestmentRepository;
         $this->investmentRepository = $investmentRepository;
         $this->userRepository = $userRepository;
         $this->reportRepository = $reportRepository;
+        $this->PoolGroupsRepository = $PoolGroupsRepository;
     }
 
     /**
@@ -62,6 +67,39 @@ class UserInvestmentService extends SmsService
         return response()->json(['success' => $success], 200);
     }
 
+    public function getInvestmentPerday($request)
+    {
+        $user = Auth::user();
+        if(($user['user_category'] != "Admin") && ($user['user_category'] != "SuperAdmin"))
+        {
+            $error = [
+                'StatusCode' => 401,
+                'Message' => 'You are not authorized to view user list.'
+            ];
+
+            return response()->json(['error' => $error], 401);
+        }else{
+            $data = [];
+            $investment_count = $this->userInvestmentRepository->get_investment_per_day();
+            if($investment_count){
+            $success['StatusCode'] = 200;
+            $success['Message'] = 'Data was successfully fetched';
+            $success['Data'] = $investment_count;
+    
+            return response()->json(['success' => $success], 200);
+            }else{
+ 
+                    $error = [
+                        'StatusCode' => 401,
+                        'Message' => 'Error occured fetrching data,try gain later.'
+                    ];
+    
+                    return response()->json(['error' => $error], 401);
+            }
+
+        }
+    }
+
     /**
      * @param $userId
      * @return \Illuminate\Http\JsonResponse
@@ -69,17 +107,20 @@ class UserInvestmentService extends SmsService
     public function listInvestmentOfUser($userId)
     {
         $data = [];
+	$inv = [];
         $investment_user = $this->userInvestmentRepository->get_investment_of_user($userId);
 
         for($i = 0; $i < count($investment_user); $i++)
         {
             $investment = $this->investmentRepository->orderBy('id', 'desc')->getById($investment_user[$i]['investment_id']);
             array_push($data, $investment);
+	    array_push($inv, $investment_user);
         }
 
         $success['StatusCode'] = 200;
         $success['Message'] = 'Investment was successfully fetched';
         $success['Data'] = $data;
+	$success['Inv']=$investment_user;
 
         return response()->json(['success' => $success], 200);
     }
@@ -166,6 +207,8 @@ class UserInvestmentService extends SmsService
         return response()->json(['success' => $success], 200);
     }
 
+   
+
     /**
      * @param $request
      * @return \Illuminate\Http\JsonResponse
@@ -189,14 +232,24 @@ class UserInvestmentService extends SmsService
             return response()->json(['error' => $error], 401);
         }
 
-        $requestData = [
-            'investment_id' => $request['investment_id'],
-            'amount_paid' => $request['amount_paid'],
-            'payment_reference' => $request['payment_reference'],
-            'number_of_pools' => $request['number_of_pools'],
-            'user_id' => $user['email'],
-        ];
-
+        if($user['user_category'] == "Admin"){
+            $requestData = [
+                'investment_id' => $request['investment_id'],
+                'amount_paid' => $request['amount_paid'],
+                'payment_reference' => $request['payment_reference'],
+                'number_of_pools' => $request['number_of_pools'],
+                'user_id' => $request['user_email'],
+              ];
+        }else{
+               $requestData = [
+                'investment_id' => $request['investment_id'],
+                'amount_paid' => $request['amount_paid'],
+                'payment_reference' => $request['payment_reference'],
+                'number_of_pools' => $request['number_of_pools'],
+                'user_id' => $user['email'],
+              ];
+        }
+    
         $this->userInvestmentRepository->create($requestData);
 
         // update $num_of_pools_taken
@@ -230,10 +283,38 @@ class UserInvestmentService extends SmsService
 
         $this->sendMail($mailData);
 
+        $timestamp = now();
+        $ip = \Request::ip();
+
+        $this->reportRepository ->track_user_activity($user['email'],$user['email'].' was added to investment '.$request['investment_id'],$timestamp,$ip,3);
 
         $success['StatusCode'] = 200;
         $success['Message'] = 'Investment pool was successful';
 
         return response()->json(['success' => $success], 200);
     }
+
+    /**
+     * @param $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function withdraw($request)
+    {
+        $mailData = [
+            'name' => 'first_name',
+            'email' => $request['email'],
+            'subject' => 'Withdrawal Notification',
+            'mailTo' => 'ibraheemkabir9@gmail.com',
+            'view' => 'withdrawRequest',
+            'webpage' => getenv('WEBPAGE'),
+        ];
+
+        $this->sendMail($mailData);
+        $success['StatusCode'] = 200;
+        $success['Message'] = 'withdraw request was successfully sent';
+
+        return response()->json(['success' => $success], 200);
+    }
+
+
 }

@@ -7,17 +7,20 @@ use App\Repositories\InvestmentRepository;
 use App\Repositories\OtpRepository;
 use App\Repositories\UserInvestmentRepository;
 use App\Repositories\UserRepository;
+use App\Repositories\ReportRepository;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Request;
 
 class UserService extends SmsService
 {
-    protected $authenticationRepository, $userRepository, $userInvestmentRepository, $investmentRepository, $otpService,
+    protected $authenticationRepository,$reportRepository, $userRepository, $userInvestmentRepository, $investmentRepository, $otpService,
                 $otpRepository;
 
     /**
      * UserService constructor.
+     * @param ReportRepository $reportRepository
      * @param UserRepository $userRepository
      * @param UserInvestmentRepository $userInvestmentRepository
      * @param InvestmentRepository $investmentRepository
@@ -28,6 +31,7 @@ class UserService extends SmsService
                                 UserInvestmentRepository $userInvestmentRepository,
                                 InvestmentRepository $investmentRepository,
                                 OtpService $otpService,
+                                ReportRepository $reportRepository,
                                 OtpRepository $otpRepository)
     {
         $this->userRepository = $userRepository;
@@ -35,6 +39,7 @@ class UserService extends SmsService
         $this->investmentRepository = $investmentRepository;
         $this->otpService = $otpService;
         $this->otpRepository = $otpRepository;
+        $this->reportRepository = $reportRepository;
     }
 
     public function list()
@@ -51,7 +56,7 @@ class UserService extends SmsService
         }
         else
         {
-            $userList = $this->userRepository->orderBy('id', 'desc')->get();
+            $userList = $this->userRepository->get_all_users();
             $success = [
                 'StatusCode' => 200,
                 'Message' => 'User successfully created',
@@ -84,6 +89,7 @@ class UserService extends SmsService
             $userData = [
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
+		'phone_number' => $data['phone_number'],
                 'email' => $data['email'],
                 'user_category' => $data['user_category'],
                 'authentication_type' => $data['authentication_type'],
@@ -250,10 +256,9 @@ class UserService extends SmsService
      * @param $data
      * @return \Illuminate\Http\JsonResponse
      */
-    public function adminUpdateUser($data)
+    public function adminUpdateUser($data,Request $request)
     {
         $authData = Auth::user();
-
         if(($authData['user_category'] != "Admin") && ($authData['user_category'] != "SuperAdmin"))
         {
             $error = [
@@ -286,12 +291,43 @@ class UserService extends SmsService
             ];
 
             $this->userRepository->updateById($data['id'], $userData);
-
+            $timestamp = now();
+            $ip = \Request::ip();
+            $this->userRepository->track_user_activity($authData['email'],$authData['name'].' updated '.$data['first_name'].'`s profile'.$request,$timestamp,$ip);
             $success['StatusCode'] = 200;
             $success['Message'] = 'Data successfully updated';
+            $success['Data'] = $response;
 
             return response()->json(['success' => $success], 200);
         }
+    }
+
+    /**
+     * @param $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function recordViewStats($request)
+    {
+        $ip = \Request::ip();
+        $this->userRepository->investment_views($request['investment_id'],$ip);
+        $success['StatusCode'] = 200;
+        return response()->json(['success' => $success], 200);
+    }
+
+     /**
+     * @param $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getViewStats($request)
+    {
+        $ip = \Request::ip();
+        $response = $this->userRepository->get_investment_views();
+
+        $success['StatusCode'] = 200;
+        $success['Message'] = 'Data successfully recorded';
+        $success['Data'] = $response;
+
+        return response()->json(['success' => $success], 200);
     }
 
     /**
@@ -346,6 +382,9 @@ class UserService extends SmsService
             ];
 
             $this->sendMail($mailData);
+            $timestamp = now();
+            $ip = \Request::ip();
+            $this->userRepository->track_user_activity($authData['email'],$authData['first_name'].' successfully changed '.'password',$timestamp,$ip,2);
 
             $success = [
                 'StatusCode' => 200,
@@ -514,6 +553,7 @@ class UserService extends SmsService
 
             if(Auth::attempt(['email' => $userData[0]['email'], 'password' => $password])){
                 $authentication = Auth::user();
+                $authData = Auth::user();
 
 //                if($authentication['authentication_type'] === "E")
 //                {
@@ -539,6 +579,9 @@ class UserService extends SmsService
                     ];
 
                     $this->sendMail($mailData);
+                    $timestamp = now();
+                    $ip = \Request::ip();
+                    $this->userRepository->track_user_activity($authData['email'],$authentication['first_name'].' logged in',$timestamp,$ip,3);
 
                     $success['statusCode'] = 200;
                     $success['message'] =  'OTP sent to your email address';
@@ -645,6 +688,31 @@ class UserService extends SmsService
      * @param $request
      * @return \Illuminate\Http\JsonResponse
      */
+    public function adminUpdatePreference($request)
+    {
+        $currentUser = Auth::user();
+
+        $requestData = [
+            'updates_on_new_plans' => $request['updates_on_new_plans'],
+            'email_updates_on_investment_process' => $request['email_updates_on_investment_process']
+        ];
+
+        $pref = $this->userRepository->updateById($request['user_id'], $requestData);
+        $user = $this->userRepository->getById($request['user_id']);
+        $timestamp = now();
+        $ip = \Request::ip();
+        $this->reportRepository ->track_user_activity($currentUser['email'],$currentUser['first_name'].' updated '.$user['first_name'].'`s preferences',$timestamp,$ip,2);
+        $success['StatusCode'] = 200;
+        $success['Message'] = 'Preference was successfully updated';
+        $success['Data'] = $pref;
+
+        return response()->json(['success' => $success], 200);
+    }
+
+    /**
+     * @param $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function updateAccountDetail($request)
     {
         $currentUser = Auth::user();
@@ -673,6 +741,77 @@ class UserService extends SmsService
         $success['Message'] = 'Account Detail was successfully updated';
         $success['Data'] = $acc;
 
+
+        return response()->json(['success' => $success], 200);
+    }
+
+    /**
+     * @param $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function adminUpdateAccountDetail($request)
+    {
+        $ip = \Request::ip();
+        $authData = Auth::user();
+        if(($authData['user_category'] != "Admin") && ($authData['user_category'] != "SuperAdmin"))
+        {
+            $error = [
+                'StatusCode' => 401,
+                'Message' => 'You are not authorized to update this user data.'
+            ];
+
+            return response()->json(['error' => $error], 401);
+
+        }else{
+        $currentUser = Auth::user();
+
+        $requestData = [
+            'account_name' => $request['account_name'],
+            'account_number' => $request['account_number'],
+            'bank_name' => $request['bank_name'],
+            'bank_code' => $request['bank_code']
+        ];
+
+        $acc = $this->userRepository->updateById($request['user_id'], $requestData);
+
+        $mailData = [
+            'name' => $request['first_name'],
+            'email' => $request['email'],
+            'subject' => 'Account details update',
+            'mailTo' => $request['email'],
+            'view' => 'account_update_success',
+            'webpage' => getenv('WEBPAGE'),
+        ];
+
+        $user = $this->userRepository->getById($request['user_id']);
+        $response = $this->userRepository->get_user_groups();
+        $this->sendMail($mailData);
+
+        $success['StatusCode'] = 200;
+        $success['Message'] = 'Account Detail was successfully updated';
+        $success['Data'] = $acc;
+        $success['datas'] = $response;
+        $success['categories'] = $categories;
+        $timestamp = now();
+        $ip = \Request::ip();
+        $this->reportRepository->track_user_activity($authData['email'],$authData['first_name'].' updated '.$acc['first_name'].'`s profile ',$timestamp,$ip,2);
+        return response()->json(['success' => $success], 200);
+        }
+    }
+
+       /**
+     * @param $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function trackUserActivity($request)
+    {
+        $ip = \Request::ip();
+        $authData = Auth::user();
+        $ip = \Request::ip();
+        $timestamp = now();
+        $this->reportRepository->track_user_activity($authData['email'],$request['message'],$timestamp,$ip,$request['type']);
+
+        $success['StatusCode'] = 200;
         return response()->json(['success' => $success], 200);
     }
 
@@ -685,18 +824,26 @@ class UserService extends SmsService
         $user = $this->userRepository->where('email', $request['email'])->get();
 
         $d = [];
+        $total = 0;
+        $slots = 0;
+        $number = 0;
         $investment_user = $this->userInvestmentRepository->get_investment_of_user($request['email']);
 
         for($i = 0; $i < count($investment_user); $i++)
         {
             $investment = $this->investmentRepository->orderBy('id', 'desc')
                                                     ->getById($investment_user[$i]['investment_id']);
+            $total += $investment_user[$i]['amount_paid'];
+            $slots += $investment_user[$i]['number_of_pools'];
             array_push($d, $investment);
         }
 
         $data['user'] = $user;
         $data['investment'] = $d;
-
+        $data['user_investment']= $investment_user;
+        $data['number_of_investments']= count($investment_user);
+        $data['total'] = $total;
+        $data['total_slots'] = $slots;
         $success['StatusCode'] = 200;
         $success['Message'] = 'Profile was successfully fetched';
         $success['Data'] = $data;
@@ -782,7 +929,9 @@ class UserService extends SmsService
                     'Message' => 'User account successfully deactivated',
                     'Data' => $result
                 ];
-
+                $timestamp = now();
+                $ip = \Request::ip();
+                $this->reportRepository ->track_user_activity($authData['email'],' deactivated '.${$userData[0]['first_name']}.'`s account',$timestamp,$ip,3);
                 return response()->json(['success' => $success], 200);
             }
             else
@@ -796,4 +945,130 @@ class UserService extends SmsService
             }
         }
     }
+
+    /**
+     * @param $request
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Exception
+     */
+    public function adminUserdelete($request)
+    {
+        $user = Auth::user();
+        if(($user['user_category'] != "Admin") && ($user['user_category'] != "SuperAdmin"))
+        {
+            $error = [
+                'StatusCode' => 401,
+                'Message' => 'You are not authorized to delete this user.'
+            ];
+
+            return response()->json(['error' => $error], 401);
+        }
+        else
+        {
+            
+            $userData = $this->userRepository->where('email', $request['email'])->get();
+
+            if(count($userData) > 0)
+            {
+                $id = $userData[0]['id'];
+                $result = $this->userRepository->deleteById($id);
+
+                $success['StatusCode'] = 200;
+                $success['Message'] = 'User was successfully deleted';
+                $timestamp = now();
+                $ip = \Request::ip();
+                $this->reportRepository ->track_user_activity($authData['email'],' deleted '.$userData[0]['first_name'].'`s account',$timestamp,$ip);
+                return response()->json(['success' => $success], 200);
+            }
+            else
+            {
+                $error = [
+                    'StatusCode' => 401,
+                    'Message' => 'An error occured deleting this user'
+                ];
+
+                return response()->json(['error' => $error], 401);
+            }
+        }
+    }
+
+      /**
+     * @param $request
+     * @return \Illuminate\Http\JsonResponse
+     * @throws \Exception
+     */
+    public function adminGetUserCategories()
+    {
+        $user = Auth::user();
+        if(($user['user_category'] != "Admin") && ($user['user_category'] != "SuperAdmin"))
+        {
+            $error = [
+                'StatusCode' => 401,
+                'Message' => 'You are not authorized to view this user.'
+            ];
+
+            return response()->json(['error' => $error], 401);
+        }
+        else
+        {
+            
+            $response = $this->userRepository->get_user_groups();
+            $categories = ['User','Admin','SuperAdmin'];
+
+            if($response)
+            {
+                $success['Data'] = $response;
+                $success['Categories'] = $categories;
+                $success['StatusCode'] = 200;
+                $success['Message'] = 'Categories succesfully fetched';
+                return response()->json(['success' => $success], 200);
+            }
+            else
+            {
+                $error = [
+                    'StatusCode' => 401,
+                    'Message' => 'An error occured getting the user categories'
+                ];
+
+                return response()->json(['error' => $error], 401);
+            }
+        }
+    }
+
+     /**
+     * @param $data
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function adminUpdateUserCategory($data)
+    {
+        $authData = Auth::user();
+        if(($authData['user_category'] != "Admin") && ($authData['user_category'] != "SuperAdmin"))
+        {
+            $error = [
+                'StatusCode' => 401,
+                'Message' => 'You are not authorized to update user data.'
+            ];
+
+            return response()->json(['error' => $error], 401);
+
+        }else{
+            
+            $success = [];
+
+            $userData = [
+                'user_category' => $data['user_category'],
+            ];
+            $userda = $this->userRepository->where('id', $data['id'])->get();
+
+            $this->userRepository->updateById($data['id'], $userData);
+            $timestamp = now();
+            $ip = \Request::ip();
+            $this->userRepository->track_user_activity($authData['email'],$authData['first_name'].' updated '.$userda['first_name'].'`s category',$timestamp,$ip,3);
+            $success['StatusCode'] = 200;
+            $success['Message'] = 'User Category successfully updated';
+
+            return response()->json(['success' => $success], 200);
+        }
+    }
+
 }

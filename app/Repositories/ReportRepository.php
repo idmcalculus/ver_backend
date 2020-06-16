@@ -84,6 +84,63 @@ class ReportRepository extends BaseRepository
             ->sum('amount_paid');
     }
 
+    public function fetch_total_amount_invested()
+    {
+        return DB::table('user_investments')
+            ->sum('amount_paid');
+    }
+
+    public function fetch_users_with_investment()
+    {
+        return DB::table('user_investments')
+            ->select('user_id',DB::raw('count(*) as no_of_pools_invested'))
+            ->groupBy('user_id')
+            ->get();
+    }
+
+    public function fetch_activities()
+    {
+        return DB::table('user_activities as CA')
+            ->rightJoin('users as C', "CA.user_id", "=", "C.email")
+            ->select('*','CA.created_at')
+ 	    ->orderBy('CA.created_at', 'desc')  
+            ->get();
+    }
+  
+ 	 public function fetch_user_investments()
+    {
+        return DB::table('user_investments as CA')
+	    ->rightJoin('investments as C', "CA.investment_id", "=", "C.id")
+            ->select('CA.created_at as date_added','CA.user_id','C.is_investment_started','CA.investment_id','C.category_id','CA.amount_paid','CA.number_of_pools','CA.id')
+	    ->orderBy('CA.created_at', 'desc')           
+            ->get();
+    }
+
+    public function fetch_users_address()
+    {
+        return DB::table('user_investments as CA')
+            ->leftJoin('users as C', "CA.user_id", "=", "C.email")
+            ->select('C.home_address', 'C.country',"CA.amount_paid")
+            ->get();
+    }
+
+    public function fetch_investment_categories_count()
+    {
+        return DB::table('user_investments as CA')
+            ->leftJoin('investments as C', "CA.investment_id", "=", "C.id")
+            ->leftJoin('categories as E', "C.category_id", "=", "E.id")
+            ->select('category_id',DB::raw('count(*) as no_of_pools_invested'))
+            ->groupBy('category_id',)
+            ->get();
+    }
+
+    public function track_user_activity($user_id,$activity,$time,$ip, $type)
+    {
+        return DB::table('user_activities')->insert([
+            ['user_id' => $user_id, 'activity' => $activity,'ip_address'=>$ip,'created_at'=>now(),'updated_at'=>now(),'type'=>$type],
+        ]);
+    }
+
     public function fetch_sum_of_pools($investment_id, $user_id)
     {
         return DB::table('user_investments')

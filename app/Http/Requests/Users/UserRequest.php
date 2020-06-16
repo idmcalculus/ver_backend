@@ -36,7 +36,7 @@ class UserRequest extends FormRequest
             'country' => 'string|max:191',
             'profile_picture' => 'string',
             'gender' => 'in:Male,Female',
-            'user_category' => 'sometimes|required|in:Super Admin,Admin,User',
+            'user_category' => 'sometimes|required|in:SuperAdmin,Admin,User',
             'authentication_type' => 'sometimes|required|in:E,Y,G,L',
             'month_of_birth' => 'string',
             'year_of_birth' => 'integer',

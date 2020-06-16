@@ -27,6 +27,14 @@ class CategoryController extends Controller
         return $this->categoryService->list();
     }
 
+     /**
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function lists()
+    {
+        return $this->categoryService->list();
+    }
+
     /**
      * @param CategoryRequest $categoryRequest
      * @return \Illuminate\Http\JsonResponse

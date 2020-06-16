@@ -23,9 +23,13 @@ Route::post('register', 'UserController@register');
 Route::get('verify_user/{data}', 'UserController@verifyUser');
 Route::post('reset_password_request', 'UserController@resetPasswordRequest');
 Route::post('reset_password', 'UserController@resetPassword');
+Route::post('trackViews', 'UserController@deactivateUsers');
+Route::post('getViews', 'UserController@getViewStats');
+
 
 // Category
 Route::post('category/list', 'CategoryController@list');
+
 
 // Career
 Route::post('career/list', 'CareerController@list');
@@ -54,9 +58,15 @@ Route::group(['middleware' => 'auth:api'], function() {
     Route::post('update_preference', 'UserController@updatePreference');
     Route::post('update_account_detail', 'UserController@updateAccountDetail');
     Route::post('admin/update_user', 'UserController@adminUpdateUser');
+    Route::post('admin/update_account_detail', 'UserController@adminUpdateAccountDetail');
+    Route::post('admin/update_preference', 'UserController@adminUpdatePreference');
     Route::post('fetch_profile', 'UserController@fetchProfile');
     Route::post('user/list', 'UserController@list');
+    Route::post('user/delete', 'UserController@adminUserdelete');
     Route::post('user/validate_otp', 'UserController@validateOTP');
+    Route::post('admin/getUserCategories', 'UserController@adminGetUserCategories');
+    Route::post('admin/updateUserCategory', 'UserController@updateUserCategory');
+    Route::post('admin/track', 'UserController@trackUserActivity');
 
     // Category
     Route::post('category/create', 'CategoryController@create');
@@ -79,12 +89,22 @@ Route::group(['middleware' => 'auth:api'], function() {
     Route::post('investment/endInvestment', 'InvestmentController@endInvestment');
     Route::post('investment/startInvestment', 'InvestmentController@startInvestment');
     Route::post('investment/investment_payout_user', 'InvestmentController@investmentPayoutUsers');
+    Route::post('investment/addGroup', 'InvestmentController@addGroup');
+    Route::post('investment/addToGroup','InvestmentController@addInvestmentToGroup');
+    Route::post('investment/deleteFromGroup','InvestmentController@deleteFromGroup');
+    Route::post('investment/getInvestmentGroup','InvestmentController@getInvestmentGroup');
+    Route::post('investment/getGroups','InvestmentController@getPoolGroups');
+    Route::post('investment/deleteGroup','InvestmentController@deletePoolGroup');
+    Route::post('investment/updateGroup','InvestmentController@editPoolGroup');
+
 
     // Investment User
     Route::post('investment_user/listInvestmentUser', 'UserInvestmentController@listInvestmentUser');
     Route::post('investment_user/create', 'UserInvestmentController@create');
     Route::post('investment_user/listInvestmentOfUser', 'UserInvestmentController@listInvestmentOfUser');
+    Route::post('investment_user/getInvestmentPerDay', 'UserInvestmentController@getInvestmentPerDay');
     Route::post('investment_user/pullOutOfInvestment', 'UserInvestmentController@pullOutOfInvestment');
+    Route::post('investment_user/withdraw', 'UserInvestmentController@withdraw');
 
     // Investment Report
     Route::post('report/create', 'ReportController@create');
